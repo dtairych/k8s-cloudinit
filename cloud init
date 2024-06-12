@@ -19,6 +19,7 @@ runcmd:
 
   # Update package lists
   - apt-get update
+  - apt-get install ufw
 
   # Install Kubernetes packages
   - apt-get install -y kubeadm kubelet kubectl

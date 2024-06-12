@@ -7,15 +7,18 @@ packages:
   - apt-transport-https
   - ca-certificates
   - curl
-  - gnupg-agent
+  - gnupg
   - software-properties-common
 
 runcmd:
   # Add Kubernetes repository GPG key
-  - curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+  - curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg
 
   # Add Kubernetes repository
-  - add-apt-repository "deb http://apt.kubernetes.io/ kubernetes-xenial main"
+  - echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | tee /etc/apt/sources.list.d/kubernetes.list
+
+  # Update package lists
+  - apt-get update
 
   # Install Kubernetes packages
   - apt-get install -y kubeadm kubelet kubectl
@@ -24,8 +27,11 @@ runcmd:
   - systemctl enable kubelet
   - systemctl start kubelet
 
+  # Enable firewall
+  - ufw enable
+
   # Configure firewall rules
-  - ufw allow 22 # Allow SSH access to the server
+  - ufw allow 22/tcp  # SSH
   - ufw allow 6443/tcp  # Kubernetes API server
   - ufw allow 2379:2380/tcp  # Etcd server client API
   - ufw allow 10250/tcp  # Kubelet API
@@ -38,8 +44,7 @@ runcmd:
   - ufw allow 2381/tcp  # Portworx
   - ufw allow 9001/tcp  # Portworx
   - ufw allow 9015/tcp  # Portworx
-  - ufw reload
-  - ufw enable
+  - ufw reload # reload the firewall
 
 write_files:
   - path: /etc/kubernetes/config

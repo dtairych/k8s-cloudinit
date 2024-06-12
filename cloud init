@@ -1,5 +1,4 @@
 #cloud-config
-
 package_update: true
 package_upgrade: true
 
@@ -8,51 +7,59 @@ packages:
   - ca-certificates
   - curl
   - gnupg
+  - gpg
+  - lsb-release
   - software-properties-common
-
-runcmd:
-  # Add Kubernetes repository GPG key
-  - curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg
-
-  # Add Kubernetes repository
-  - echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | tee /etc/apt/sources.list.d/kubernetes.list
-
-  # Update package lists
-  - apt-get update
-  - apt-get install ufw
-
-  # Install Kubernetes packages
-  - apt-get install -y kubeadm kubelet kubectl
-
-  # Enable and start kubelet service
-  - systemctl enable kubelet
-  - systemctl start kubelet
-
-  # Enable firewall
-  - ufw enable
-
-  # Configure firewall rules
-  - ufw allow 22/tcp  # SSH
-  - ufw allow 6443/tcp  # Kubernetes API server
-  - ufw allow 2379:2380/tcp  # Etcd server client API
-  - ufw allow 10250/tcp  # Kubelet API
-  - ufw allow 10251/tcp  # kube-scheduler
-  - ufw allow 10252/tcp  # kube-controller-manager
-  - ufw allow 179/tcp  # Calico BGP
-  - ufw allow 4789/udp  # Calico BGP
-  - ufw allow 9099/tcp  # Calico health check
-  - ufw allow 2379:2380/tcp  # Etcd server client API
-  - ufw allow 2381/tcp  # Portworx
-  - ufw allow 9001/tcp  # Portworx
-  - ufw allow 9015/tcp  # Portworx
-  - ufw reload # reload the firewall
+  - containerd
+  - kubeadm
+  - kubelet
+  - kubectl
+  - ufw
+  - locales
 
 write_files:
-  - path: /etc/kubernetes/config
-    owner: root:root
-    permissions: '0644'
+  - path: /etc/sysctl.d/k8s.conf
     content: |
-      apiVersion: kubeadm.k8s.io/v1beta2
-      kind: ClusterConfiguration
-      networking:
-        podSubnet: "10.244.0.0/16"
+      net.bridge.bridge-nf-call-iptables = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.ipv4.ip_forward = 1
+
+runcmd:
+  - apt install gnupg2 -y
+  - locale-gen en_US.UTF-8
+  - update-locale LANG=en_US.UTF-8
+  - modprobe br_netfilter
+  - sysctl --system
+  - swapoff -a
+  - sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+  - mkdir -p /etc/apt/keyrings
+  - curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  - echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" | tee /etc/apt/sources.list.d/kubernetes.list
+  - apt-get update
+  - apt-get install -y kubelet kubeadm kubectl
+  - apt-mark hold kubelet kubeadm kubectl
+  - systemctl enable kubelet
+  - systemctl start kubelet
+  - mkdir -p /etc/containerd
+  - containerd config default > /etc/containerd/config.toml
+  - sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+  - systemctl restart containerd
+  - apt-get install -y ufw
+  - ufw allow ssh
+  - ufw allow 179/tcp   # Calico
+  - ufw allow 2379:2380/tcp # etcd server client API
+  - ufw allow 6443/tcp  # Kubernetes API server
+  - ufw allow 10250/tcp # Kubelet API
+  - ufw allow 10251/tcp # kube-scheduler
+  - ufw allow 10252/tcp # kube-controller-manager
+  - ufw allow 10255/tcp # Read-only Kubelet API
+  - ufw allow 2049/tcp  # Portworx
+  - ufw allow 3000/tcp  # Portworx
+  - ufw allow 3260/tcp  # Portworx
+  - ufw allow 9001/tcp  # Portworx
+  - ufw --force enable
+  - systemctl start ufw
+  - kubeadm config images pull
+  - systemctl restart kubelet
+  - ufw status verbose > /var/log/ufw_status.log
+  - echo "UFW installation and configuration completed."

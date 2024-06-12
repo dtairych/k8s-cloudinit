@@ -1,0 +1,52 @@
+#cloud-config
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg-agent
+  - software-properties-common
+
+runcmd:
+  # Add Kubernetes repository GPG key
+  - curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+
+  # Add Kubernetes repository
+  - add-apt-repository "deb http://apt.kubernetes.io/ kubernetes-xenial main"
+
+  # Install Kubernetes packages
+  - apt-get install -y kubeadm kubelet kubectl
+
+  # Enable and start kubelet service
+  - systemctl enable kubelet
+  - systemctl start kubelet
+
+  # Configure firewall rules
+  - ufw allow 22 # Allow SSH access to the server
+  - ufw allow 6443/tcp  # Kubernetes API server
+  - ufw allow 2379:2380/tcp  # Etcd server client API
+  - ufw allow 10250/tcp  # Kubelet API
+  - ufw allow 10251/tcp  # kube-scheduler
+  - ufw allow 10252/tcp  # kube-controller-manager
+  - ufw allow 179/tcp  # Calico BGP
+  - ufw allow 4789/udp  # Calico BGP
+  - ufw allow 9099/tcp  # Calico health check
+  - ufw allow 2379:2380/tcp  # Etcd server client API
+  - ufw allow 2381/tcp  # Portworx
+  - ufw allow 9001/tcp  # Portworx
+  - ufw allow 9015/tcp  # Portworx
+  - ufw reload
+  - ufw enable
+
+write_files:
+  - path: /etc/kubernetes/config
+    owner: root:root
+    permissions: '0644'
+    content: |
+      apiVersion: kubeadm.k8s.io/v1beta2
+      kind: ClusterConfiguration
+      networking:
+        podSubnet: "10.244.0.0/16"

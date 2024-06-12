@@ -26,6 +26,7 @@ write_files:
 
 runcmd:
   - apt install gnupg2 -y
+  - apt install containerd -y
   - locale-gen en_US.UTF-8
   - update-locale LANG=en_US.UTF-8
   - modprobe br_netfilter
@@ -44,6 +45,7 @@ runcmd:
   - containerd config default > /etc/containerd/config.toml
   - sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
   - systemctl restart containerd
+  - systemctl enable containerd
   - apt-get install -y ufw
   - ufw allow ssh
   - ufw allow 179/tcp   # Calico

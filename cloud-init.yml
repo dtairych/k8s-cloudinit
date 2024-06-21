@@ -16,6 +16,8 @@ packages:
   - kubectl
   - ufw
   - locales
+  - lvm
+  - git
 
 write_files:
   - path: /etc/modules-load.d/containerd.conf
@@ -29,6 +31,8 @@ write_files:
       net.bridge.bridge-nf-call-ip6tables = 1
 
 runcmd:
+  - apt install git -y
+  - apt install lvm -y
   - apt install gnupg2 -y
   - locale-gen en_US.UTF-8
   - update-locale LANG=en_US.UTF-8
